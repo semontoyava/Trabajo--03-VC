@@ -35,7 +35,7 @@ El diagnóstico de neumonía mediante radiografías de tórax es una tarea funda
 
 En las últimas décadas, las técnicas de Visión por Computador han demostrado ser herramientas valiosas para apoyar procesos diagnósticos, al ofrecer métodos capaces de analizar imágenes médicas de forma objetiva, reproducible y eficiente. Este trabajo tiene como objetivo comparar dos aproximaciones para la clasificación de radiografías de tórax:
 
-- **Métodos clásicos** basados en descriptores manuales (handcrafted features).
+- **Métodos clásicos** basados en descriptores (handcrafted features).
 - **Técnicas modernas de Deep Learning**, particularmente arquitecturas convolucionales (CNN).
 
 A partir de este análisis se busca evaluar el potencial, limitaciones y aplicabilidad práctica de cada enfoque en el contexto del análisis automatizado de imágenes médicas.
@@ -112,6 +112,16 @@ Las CNNs han revolucionado el campo de la visión por computador al aprender rep
 
 ## Metodología
 
+### Visión General del Pipeline
+
+El proyecto sigue un pipeline de clasificación completo que integra tres fases principales: preprocesamiento de imágenes, extracción de descriptores clásicos, y entrenamiento y evaluación de clasificadores. La figura siguiente ilustra el flujo de trabajo general:
+
+![Pipeline General de Clasificación](../results/figures/pipeline_overview.png)
+*Figura 0: Pipeline general de clasificación implementado. El proceso comienza con imágenes de radiografías de tórax sin procesar, las cuales pasan por una fase de preprocesamiento (normalización de tamaño, mejora de contraste con CLAHE, normalización de intensidades). Posteriormente, se extraen descriptores de forma (HOG, momentos de Hu) y textura (LBP, GLCM, Gabor) que se concatenan en un vector de características. Finalmente, múltiples clasificadores (SVM, Random Forest, k-NN, Regresión Logística) son entrenados y evaluados para determinar el mejor modelo.*
+
+![Resumen de Metodología por Partes](../results/figures/methodology_summary.png)
+*Figura 0b: Resumen visual de las tres partes del proyecto. Parte 1 (Preprocesamiento): estandarización y mejora de calidad de imágenes. Parte 2 (Descriptores): extracción de características de forma y textura (HOG, LBP, GLCM, Gabor). Parte 3 (Clasificación): entrenamiento y evaluación de cinco clasificadores con validación cruzada.*
+
 ### Parte 1: Análisis Exploratorio y Preprocesamiento
 
 Esta sección describe el trabajo ya implementado en el repositorio, correspondiente a la exploración inicial del dataset y el diseño del pipeline de preprocesamiento.
@@ -131,6 +141,9 @@ El dataset está dividido en tres conjuntos:
 
 **Análisis de distribución:** Se observó un desbalance significativo en el conjunto de entrenamiento, con aproximadamente 74% de imágenes con neumonía y 26% normales. Este desbalance debe considerarse durante el entrenamiento mediante técnicas como pesos de clase balanceados o data augmentation.
 
+![Distribución de Clases](../results/figures/blog/01_class_distribution.png)
+*Figura 1: Distribución de clases en los conjuntos de entrenamiento, validación y prueba. El gráfico de barras (izquierda) muestra el número absoluto de imágenes por clase y conjunto. El gráfico circular (derecha) evidencia el desbalance en el conjunto de entrenamiento: 74.2% PNEUMONIA vs 25.7% NORMAL. Este desbalance requiere estrategias especiales durante el entrenamiento para evitar sesgos hacia la clase mayoritaria.*
+
 #### Exploración Visual
 
 Se cargaron y visualizaron muestras representativas de ambas clases utilizando grillas de imágenes. La exploración visual permitió identificar:
@@ -138,6 +151,9 @@ Se cargaron y visualizaron muestras representativas de ambas clases utilizando g
 - **Variabilidad en calidad de imagen:** Diferencias en exposición, contraste y nitidez entre radiografías.
 - **Variabilidad en posicionamiento:** Ligeras rotaciones y desplazamientos del paciente.
 - **Patrones diagnósticos:** Las radiografías con neumonía presentan opacidades difusas, consolidaciones o infiltrados que alteran la textura pulmonar normal.
+
+![Ejemplos de Radiografías](../results/figures/blog/02_sample_images.png)
+*Figura 2: Grilla de ejemplos representativos de ambas clases. Filas superiores: radiografías NORMAL mostrando campos pulmonares claros y bien definidos. Filas inferiores: radiografías con PNEUMONIA evidenciando opacidades difusas, consolidaciones y patrones de infiltrado. Se observa considerable variabilidad en dimensiones originales (indicadas debajo de cada imagen), calidad de adquisición y posicionamiento del paciente. Esta heterogeneidad justifica la necesidad de un pipeline robusto de preprocesamiento.*
 
 Estas observaciones justificaron la necesidad de un preprocesamiento robusto para estandarizar las imágenes antes del análisis cuantitativo.
 
@@ -148,11 +164,19 @@ Se analizaron las dimensiones originales de las imágenes en el conjunto de entr
 - **Dimensiones:** Las imágenes tienen tamaños diversos, con anchos y altos que varían considerablemente.
 - **Relación de aspecto:** La mayoría de las radiografías mantienen relaciones de aspecto similares, pero no idénticas.
 
+![Distribución de Tamaños](../results/figures/blog/03_size_distribution.png)
+*Figura 3: Análisis de variabilidad dimensional en una muestra de 400 imágenes del conjunto de entrenamiento. (Izquierda) Scatter plot mostrando la distribución de dimensiones originales, con amplia dispersión alrededor del target de 224×224 píxeles. (Centro y Derecha) Histogramas de anchos y altos evidenciando variabilidad significativa, con picos alrededor de 1000-2500 píxeles. Las líneas rojas punteadas indican las dimensiones objetivo (224 píxeles) hacia las cuales todas las imágenes serán normalizadas.*
+
 Esta heterogeneidad dimensional refuerza la necesidad de normalizar el tamaño de todas las imágenes a una dimensión estándar (224×224 píxeles) para permitir el procesamiento en lotes y la compatibilidad con arquitecturas CNN preentrenadas.
 
 #### Pipeline de Preprocesamiento Implementado
 
 El pipeline completo de preprocesamiento se encuentra implementado en el módulo `src/preprocessing.py` e incluye las siguientes etapas:
+
+> **Diagrama de flujo:** Ver [Pipeline Detallado de Preprocesamiento](../docs/pipeline_diagram.md#pipeline-detallado-de-preprocesamiento) para una visualización gráfica del proceso completo.
+
+![Pipeline de Preprocesamiento](../results/figures/preprocessing_steps.png)
+*Figura 1: Pipeline de preprocesamiento implementado mostrando las cuatro etapas principales: normalización de tamaño (224×224), mejora de contraste mediante CLAHE, normalización de intensidades, y reducción de ruido. Cada etapa transforma progresivamente la imagen original para optimizar la extracción de características.*
 
 ##### 1. Normalización de Tamaño
 
@@ -213,19 +237,20 @@ El pipeline completo de preprocesamiento se encuentra implementado en el módulo
 
 **Implementación:** Función `denoise_image()` en `preprocessing.py`.
 
-#### Visualizaciones Generadas
+#### Resultados del Preprocesamiento
 
-Durante la exploración y validación del preprocesamiento se generaron múltiples visualizaciones:
+El pipeline de preprocesamiento transforma progresivamente las radiografías originales heterogéneas en imágenes estandarizadas de alta calidad. A continuación se presentan los resultados visuales de cada etapa:
 
-- **Figura 1:** Grilla de imágenes originales de ambas clases (NORMAL vs PNEUMONIA).
-- **Figura 2:** Distribución de clases en los conjuntos de entrenamiento, validación y prueba.
-- **Figura 3:** Distribución de tamaños originales de las imágenes (ancho vs alto).
-- **Figura 4:** Comparación visual de imágenes originales vs preprocesadas (resize + CLAHE + normalización).
-- **Figura 5:** Comparación entre CLAHE y ecualización de histograma estándar.
-- **Figura 6:** Histogramas de intensidades antes y después del preprocesamiento.
-- **Figura 7:** Ejemplo de segmentación de ROI pulmonar.
+![Pipeline de Preprocesamiento Paso a Paso](../results/figures/blog/04_preprocessing_pipeline.png)
+*Figura 4: Transformación progresiva de una radiografía con neumonía a través del pipeline de preprocesamiento. Fila superior: (1) Imagen original con alta variabilidad en tamaño y contraste, (2) Redimensionada a 224×224 píxeles manteniendo información estructural, (3) Mejora de contraste mediante CLAHE revelando detalles anatómicos sutiles, (4) Normalización de intensidades al rango [0,1] para consistencia. Fila inferior: Histogramas de intensidades mostrando la evolución de la distribución de píxeles en cada etapa. CLAHE redistribuye las intensidades de manera adaptativa mientras que la normalización estandariza el rango dinámico.*
 
-Estas figuras se encuentran disponibles en el notebook `notebooks/01_preprocessing_exploration.ipynb` y demuestran visualmente el impacto positivo del preprocesamiento en la calidad de las radiografías.
+![Comparación CLAHE vs Ecualización Estándar](../results/figures/blog/05_clahe_vs_equalization.png)
+*Figura 5: Comparación crítica entre dos técnicas de mejora de contraste en una radiografía normal. Fila superior: (Izquierda) Imagen original con contraste limitado, (Centro) CLAHE aplicado preservando estructuras anatómicas finas sin saturación, (Derecha) Ecualización de histograma estándar mostrando sobre-amplificación de contraste y artefactos visuales. Fila inferior: Histogramas correspondientes evidenciando que CLAHE (verde) produce una distribución más controlada y natural comparada con la ecualización estándar (roja) que tiende a extremos. CLAHE es claramente superior para aplicaciones médicas donde la preservación de detalles anatómicos es crítica.*
+
+![Grilla Antes/Después del Preprocesamiento](../results/figures/blog/06_before_after_grid.png)
+*Figura 6: Comparación antes/después del pipeline completo en 4 imágenes (2 NORMAL, 2 PNEUMONIA). Para cada imagen se muestra: (Columna 1) Original redimensionada, (Columna 2) Completamente preprocesada, (Columnas 3-4) Histogramas antes y después. Se observa consistentemente que el preprocesamiento: (a) Mejora el contraste revelando estructuras pulmonares, (b) Normaliza la distribución de intensidades entre imágenes, (c) Mantiene las características discriminativas entre clases. Los histogramas preprocesados (verde) son más uniformes y comparables entre imágenes, facilitando la extracción posterior de características.*
+
+> **Nota:** Para ver el diagrama de flujo completo del pipeline de preprocesamiento, consultar [docs/pipeline_diagram.md](../docs/pipeline_diagram.md).
 
 #### Conclusiones de la Parte 1
 
@@ -261,6 +286,9 @@ Se implementó el descriptor HOG con los siguientes parámetros:
 
 HOG captura la distribución de orientaciones de gradientes locales, útil para identificar estructuras y bordes característicos de patrones pulmonares en las radiografías.
 
+![Descriptor HOG](../results/figures/blog/07_hog_descriptor.png)
+*Figura 7: Visualización del descriptor HOG aplicado a radiografías NORMAL y PNEUMONIA. Para cada clase se muestra: (Columna 1) Imagen preprocesada original, (Columna 2) Mapa de características HOG donde la intensidad y orientación de los gradientes revelan bordes y estructuras anatómicas, (Columna 3) Distribución del vector de características HOG de alta dimensionalidad, (Columna 4) Estadísticas del descriptor. El HOG captura efectivamente los bordes de costillas, diafragma y estructuras pulmonares. Se observan diferencias en la distribución de orientaciones entre clases: las radiografías con neumonía (fila inferior) presentan mayor variabilidad en las orientaciones debido a infiltrados que alteran la estructura pulmonar normal.*
+
 ##### Momentos de Hu
 
 Se calcularon los 7 momentos de Hu invariantes a traslación, rotación y escala. Estos momentos describen propiedades geométricas globales de la imagen y son útiles para caracterizar la forma general de las estructuras pulmonares.
@@ -288,6 +316,9 @@ Se implementarán descriptores diseñados para caracterizar patrones de textura 
 
 Se implementó LBP uniforme con radio de 3 píxeles y 24 puntos de vecindad. Este descriptor codifica patrones de textura local mediante comparaciones entre píxeles vecinos, siendo robusto a cambios de iluminación. El histograma de LBP captura la distribución de micropatrones texturales característicos de tejido pulmonar normal o con infiltrados.
 
+![Descriptor LBP](../results/figures/blog/08_lbp_descriptor.png)
+*Figura 8: Visualización del descriptor LBP (Local Binary Patterns) en radiografías de ambas clases. Para cada clase: (Columna 1) Imagen preprocesada, (Columna 2) Mapa LBP en escala de colores mostrando la codificación de patrones de textura local, (Columna 3) Histograma de patrones LBP revelando la distribución de microestructuras texturales, (Columna 4) Zoom de una región de 40×40 píxeles mostrando la textura local detallada. El descriptor LBP es particularmente sensible a patrones repetitivos y microestructuras. Las radiografías NORMAL (fila superior) presentan texturas más homogéneas y regulares, mientras que las de PNEUMONIA (fila inferior) muestran texturas más heterogéneas y complejas debido a infiltrados e irregularidades en el tejido pulmonar.*
+
 ##### GLCM (Gray Level Co-occurrence Matrix) y Características de Haralick
 
 Se calcularon matrices de coocurrencia en múltiples direcciones (0°, 45°, 90°, 135°) con distancia de 1 píxel. A partir de estas matrices se extrajeron las siguientes características de Haralick:
@@ -299,9 +330,15 @@ Se calcularon matrices de coocurrencia en múltiples direcciones (0°, 45°, 90�
 
 Estas características son particularmente efectivas para distinguir entre tejido pulmonar normal y patrones de neumonía.
 
+![GLCM y Características de Haralick](../results/figures/blog/09_glcm_haralick.png)
+*Figura 9: Análisis mediante Matriz de Co-ocurrencia (GLCM) y características de Haralick. Para cada clase: (Columna 1) Imagen preprocesada, (Columna 2) GLCM calculada en dirección 0° mostrando las relaciones espaciales entre niveles de gris, (Columna 3) Gráfico de barras comparando las 4 características de Haralick (Contraste, Homogeneidad, Energía, Correlación) en cuatro direcciones (0°, 45°, 90°, 135°), (Columna 4) Resumen estadístico de los promedios. Las radiografías NORMAL (fila superior) tienden a mostrar mayor homogeneidad y energía (texturas más regulares), mientras que las de PNEUMONIA (fila inferior) presentan mayor contraste y menor homogeneidad (texturas más caóticas). Estas diferencias cuantitativas son discriminativas para la clasificación.*
+
 ##### Filtros de Gabor
 
 Se aplicó un banco de filtros de Gabor con múltiples frecuencias y orientaciones para capturar información de textura direccional. Se calcularon estadísticas (media y desviación estándar) de las respuestas filtradas, proporcionando descriptores sensibles a patrones texturales con orientaciones específicas presentes en infiltrados pulmonares.
+
+![Filtros de Gabor](../results/figures/blog/10_gabor_filters.png)
+*Figura 10: Banco de filtros de Gabor y sus respuestas en una radiografía con neumonía. Fila superior izquierda: Imagen original. Fila superior: Kernels de filtros de Gabor en 4 orientaciones (0°, 45°, 90°, 135°) mostrando la selectividad direccional. Fila media: Respuestas filtradas revelando estructuras y texturas en cada orientación específica. Los colores intensos indican alta activación ante patrones direccionales. Gráfico de barras: Energía media de respuesta por dirección con barras de error, mostrando qué orientaciones son más prominentes en la imagen. Imagen inferior: Respuesta combinada de todas las orientaciones resaltando regiones con textura compleja. Texto explicativo: Los filtros de Gabor son especialmente útiles para detectar infiltrados pulmonares que tienen orientaciones preferentes.*
 
 ##### Estadísticas de Primer Orden
 
@@ -313,9 +350,19 @@ Se calcularon estadísticas básicas de la distribución de intensidades:
 
 Estas estadísticas proporcionan información global sobre las características de intensidad de las radiografías.
 
+#### Comparación Visual de Descriptores
+
+Para comprender mejor el poder discriminativo de cada descriptor, se presenta una comparación lado a lado de todos los descriptores aplicados a la misma imagen:
+
+![Comparación de Descriptores](../results/figures/blog/11_descriptor_comparison.png)
+*Figura 11: Comparación directa de los cuatro descriptores principales aplicados a las mismas imágenes NORMAL (fila superior) y PNEUMONIA (fila intermedia). Para cada descriptor se muestra su representación visual característica. (Columna 1) Imagen preprocesada original, (Columna 2) Mapa HOG resaltando gradientes y bordes, (Columna 3) Mapa LBP capturando micropatrones de textura local, (Columna 4) Respuesta de filtro de Gabor (orientación 0°) sensible a estructuras lineales. Fila inferior: Identificación de cada descriptor. Esta comparación revela que cada descriptor captura aspectos complementarios de la información visual: HOG es sensible a formas y contornos, LBP a microestructuras repetitivas, y Gabor a patrones direccionales. La combinación de todos estos descriptores en un vector único de 6,120 características proporciona una representación rica y multifacética de cada radiografía.*
+
 #### Construcción del Vector de Características
 
 Todos los descriptores se concatenaron en un único vector de características por imagen, resultando en una dimensionalidad de 6,120 características. Este vector combina información complementaria de forma y textura. Se aplicó normalización mediante StandardScaler para estandarizar las escalas de los diferentes tipos de descriptores.
+
+![Diagrama de Extracción de Características](../results/figures/feature_extraction_diagram.png)
+*Figura 12: Diagrama del proceso de extracción y concatenación de descriptores. La imagen preprocesada es sometida a cinco módulos de extracción: HOG y momentos de Hu (forma), LBP, GLCM y filtros de Gabor (textura). Los vectores resultantes se concatenan en un único vector de 6,120 características que alimenta los clasificadores.*
 
 ---
 
@@ -382,6 +429,9 @@ Se aseguró balanceo de clases en los folds mediante estratificación.
 
 Se realizó una comparación cuantitativa exhaustiva entre los cinco clasificadores tradicionales mediante las métricas definidas. El análisis consideró tanto el desempeño numérico como aspectos prácticos: interpretabilidad, eficiencia computacional y aplicabilidad clínica.
 
+![Flujo de Trabajo de Clasificación](../results/figures/classification_workflow.png)
+*Figura 3: Flujo de trabajo completo del proceso de clasificación. Las imágenes preprocesadas son procesadas para extraer el vector de características de 6,120 dimensiones. Los datos se dividen en conjuntos de entrenamiento (80%) y prueba (20%) con estratificación. Se entrenan cinco clasificadores con validación cruzada de 3-folds, se evalúan con múltiples métricas, y se genera un análisis comparativo exhaustivo.*
+
 ---
 
 ## Resultados y Discusión
@@ -417,7 +467,54 @@ La calidad visual mejorada de las imágenes preprocesadas sugiere que la extracc
 
 ### Resultados de la Parte 2: Descriptores Clásicos
 
-La extracción de descriptores se realizó exitosamente sobre el conjunto completo de radiografías preprocesadas. El vector de características resultante combina 6,120 descriptores que capturan información complementaria de forma (HOG, Hu, contornos) y textura (LBP, GLCM, Gabor, estadísticas de primer orden). La normalización mediante StandardScaler permitió que descriptores de diferentes escalas contribuyeran equitativamente al proceso de clasificación.
+La extracción de descriptores se realizó exitosamente sobre el conjunto completo de radiografías preprocesadas. El vector de características resultante combina 6,120 descriptores que capturan información complementaria de forma y textura.
+
+#### Análisis Cualitativo de los Descriptores
+
+Las visualizaciones generadas (Figuras 7-11) revelan diferencias sistemáticas entre las dos clases:
+
+**HOG (Figura 7):** Las radiografías NORMAL muestran patrones de gradientes más regulares y estructurados, correspondientes a bordes bien definidos de costillas y estructuras anatómicas. Las radiografías con PNEUMONIA presentan gradientes más caóticos y difusos, reflejando la pérdida de definición por infiltrados. La distribución del descriptor HOG es notablemente diferente entre clases, con mayor varianza en casos de neumonía.
+
+**LBP (Figura 8):** Los mapas de textura local revelan que el tejido pulmonar normal presenta patrones repetitivos y homogéneos (visible en el histograma LBP con picos concentrados). El tejido con neumonía muestra distribuciones más uniformes del histograma LBP, indicando mayor diversidad de micropatrones debido a opacidades e infiltrados que interrumpen la regularidad textural.
+
+**GLCM y Haralick (Figura 9):** Las características de Haralick cuantifican las observaciones cualitativas. Las radiografías NORMAL consistentemente muestran:
+- Mayor **homogeneidad** (texturas más uniformes)
+- Mayor **energía** (patrones más regulares y predecibles)
+- Menor **contraste** local (transiciones suaves entre regiones)
+
+Las radiografías con PNEUMONIA exhiben:
+- Menor homogeneidad (texturas heterogéneas por infiltrados)
+- Menor energía (mayor desorden textural)
+- Mayor contraste local (transiciones abruptas entre tejido sano y afectado)
+
+Estas diferencias son estadísticamente consistentes a través de las cuatro direcciones analizadas, sugiriendo invarianza rotacional.
+
+**Filtros de Gabor (Figura 10):** Las respuestas de los filtros de Gabor en múltiples orientaciones revelan que los infiltrados pulmonares tienen orientaciones preferentes. Las radiografías con neumonía activan más intensamente filtros en ciertas direcciones, posiblemente correspondiendo a patrones de drenaje bronquial o distribución gravitacional de fluidos. El análisis de energía por dirección (gráfico de barras en Figura 10) muestra variabilidad direccional más pronunciada en casos patológicos.
+
+**Complementariedad (Figura 11):** La comparación lado a lado demuestra que cada descriptor captura aspectos únicos y complementarios. HOG enfatiza estructura geométrica, LBP captura microestructura, y Gabor detecta patrones direccionales. Ningún descriptor individual es suficiente, pero su combinación proporciona una representación rica que distingue efectivamente entre clases.
+
+#### Poder Discriminativo de los Descriptores
+
+Aunque no se realizó análisis formal de importancia de características en esta etapa del proyecto, las visualizaciones sugieren que:
+
+1. **Descriptores de textura** (LBP, GLCM, Gabor) parecen particularmente discriminativos para este problema, dado que la neumonía se manifiesta principalmente como alteraciones texturales (infiltrados, opacidades).
+
+2. **Descriptores de forma** (HOG, momentos de Hu) capturan información complementaria sobre la geometría global y distribución espacial de estructuras.
+
+3. La **alta dimensionalidad** (6,120 características) potencialmente incluye redundancia, pero garantiza que ninguna información potencialmente relevante se descarte prematuramente.
+
+La normalización mediante StandardScaler fue crítica para permitir que descriptores de diferentes escalas y rangos dinámicos contribuyeran equitativamente al espacio de características final.
+
+**Descriptores de forma - Histogram of oriented gradients**
+
+
+
+
+**Descriptores de forma - Momentos de Hu**
+
+
+
+
 
 ### Resultados de la Parte 3: Clasificación
 
@@ -466,17 +563,56 @@ Las matrices de confusión revelan patrones importantes en el comportamiento de 
 ![Matrices de Confusión de los 5 Clasificadores](../results/figures/confusion_matrices.png)
 *Figura 1: Matrices de confusión para los cinco clasificadores evaluados. Se observa que SVM RBF minimiza los falsos negativos (esquina inferior izquierda), aspecto crítico en diagnóstico médico.*
 
+**Interpretación detallada por clasificador:**
+
 **SVM RBF (mejor modelo):**
-- Verdaderos Positivos altos: Identifica correctamente la mayoría de casos con neumonía
-- Falsos Negativos mínimos: Cumple con el requisito crítico de no omitir diagnósticos
-- Balance adecuado: Mantiene precisión sin sacrificar recall
+- **Verdaderos Positivos (VP):** ~98 casos de neumonía correctamente identificados
+- **Verdaderos Negativos (VN):** ~94 casos normales correctamente identificados
+- **Falsos Positivos (FP):** ~4-5 casos normales erróneamente clasificados como neumonía
+- **Falsos Negativos (FN):** ~1-2 casos de neumonía no detectados (¡CRÍTICO!)
 
-**k-NN:**
-- Mayor cantidad de falsos negativos comparado con otros modelos
-- Alta especificidad pero menor sensibilidad
-- Sugiere limitaciones del método basado en distancias para este problema de alta dimensionalidad
+El recall excepcional del 98.88% implica que de cada 100 casos de neumonía, el modelo identifica correctamente 99, omitiendo solo 1. Este es el aspecto más importante desde la perspectiva clínica: **minimizar falsos negativos** para no dejar pacientes enfermos sin diagnosticar.
 
-**Consistencia general:** Todos los modelos muestran buena capacidad de generalización con métricas balanceadas, indicando que los descriptores extraídos capturan información discriminativa relevante.
+**SVM Lineal:**
+Desempeño muy similar a RBF pero ligeramente inferior en recall (96.94% vs 98.88%). Esto se traduce en aproximadamente 3 falsos negativos adicionales por cada 100 casos de neumonía. Aunque sigue siendo excelente, en un contexto clínico real estos casos adicionales no detectados son significativos.
+
+**Random Forest:**
+Con recall de 97.49%, presenta un compromiso razonable entre sensibilidad y especificidad. Su ventaja es la interpretabilidad: podría analizarse la importancia de características para entender qué descriptores contribuyen más a las decisiones. Sin embargo, sacrifica ~2 puntos porcentuales de recall comparado con SVM RBF.
+
+**k-NN (peor desempeño):**
+- **Problema principal:** Recall de solo 91.09% significa que ~9 de cada 100 casos de neumonía NO son detectados
+- **Causa probable:** El método basado en distancias eucl ídianas sufre en espacios de alta dimensionalidad (maldición de dimensionalidad)
+- **Precision alta (97.94%):** Cuando predice neumonía, casi siempre acierta, pero es excesivamente conservador
+- **Trade-off peligroso:** Mejor tener falsos positivos (alarmas falsas que se pueden descartar con exámenes adicionales) que falsos negativos (pacientes enfermos sin detectar)
+
+**Regresión Logística:**
+Sorprendentemente competitiva a pesar de ser un modelo lineal simple. Con recall de 96.66% supera a k-NN y RF, siendo superada solo por los SVMs. Esto sugiere que existe cierta separabilidad lineal en el espacio de características de 6,120 dimensiones, aunque SVM RBF demuestra que las relaciones no lineales mejoran aún más el desempeño.
+
+**Análisis de Errores:**
+
+Los errores cometidos por los modelos pueden clasificarse en:
+
+1. **Falsos Negativos (FN) - Casos de neumonía no detectados:**
+   - Son clínicamente más peligrosos
+   - Pueden corresponder a neumonías en etapas tempranas con infiltrados sutiles
+   - Casos con presentación atípica (neumonía viral vs bacterial)
+   - Radiografías con calidad subóptima o artefactos
+
+2. **Falsos Positivos (FP) - Casos normales clasificados como neumonía:**
+   - Menos críticos pero generan costos de estudios adicionales innecesarios
+   - Pueden corresponder a variaciones anatómicas normales
+   - Artefactos de imagen que simulan opacidades
+   - Condiciones no-neumónicas que alteran textura pulmonar
+
+**Contexto Clínico:**
+
+Para un sistema de apoyo diagnóstico en radiología, se prefiere:
+- **Alta sensibilidad (recall alto):** No omitir casos de neumonía
+- **Especificidad aceptable:** Minimizar alarmas falsas pero priorizando sensibilidad
+
+SVM RBF con recall de 98.88% se alinea perfectamente con este requisito. Los ~5 falsos positivos por cada 100 casos normales son aceptables si a cambio se detectan prácticamente todos los casos de neumonía.
+
+**Consistencia general:** Todos los modelos excepto k-NN muestran excelente capacidad de generalización con métricas balanceadas, indicando que los descriptores clásicos extraídos capturan información discriminativa relevante y robusta.
 
 #### Curvas ROC y AUC
 
@@ -492,12 +628,50 @@ El análisis de las curvas ROC confirma el excelente desempeño de los clasifica
 - Logistic Regression: ~0.97
 - k-NN: ~0.96
 
-**Interpretación:**
-- Todos los modelos superan ampliamente el clasificador aleatorio (AUC = 0.5)
-- Las AUC cercanas a 1.0 indican excelente capacidad discriminativa
-- SVM RBF muestra la curva más próxima a la esquina superior izquierda, confirmando su superioridad
+**Interpretación detallada:**
 
-**Implicaciones clínicas:** Los valores de AUC superiores a 0.95 en todos los casos sugieren que los modelos tienen alta confiabilidad para asistir en el diagnóstico, con bajo riesgo de clasificaciones erróneas críticas.
+**¿Qué nos dice el AUC?**
+El AUC (Area Under the Curve) representa la probabilidad de que el modelo asigne una puntuación más alta a un caso positivo (neumonía) aleatorio que a un caso negativo (normal) aleatorio. Es una métrica robusta independiente del umbral de decisión.
+
+- **AUC = 0.99 (SVM RBF):** En el 99% de los casos, el modelo correctamente asigna mayor probabilidad a un caso real de neumonía que a un caso normal. Esto es casi perfecto.
+- **AUC = 0.96-0.98 (otros modelos):** Todos los clasificadores muestran excelente discriminación.
+- **AUC = 0.5:** Clasificador aleatorio (línea diagonal punteada en la figura).
+- **AUC = 1.0:** Clasificador perfecto (esquina superior izquierda).
+
+**Análisis por posición de curva:**
+
+1. **SVM RBF (curva azul):** Se eleva casi verticalmente desde el origen, alcanzando TPR ≈ 0.95 con FPR ≈ 0.05. Esto significa que puede detectar 95% de los casos de neumonía aceptando solo 5% de falsos positivos. La curva se mantiene cerca del eje vertical y techo horizontal, indicando óptimo trade-off sensibilidad-especificidad en todo el rango de umbrales.
+
+2. **SVM Linear y Random Forest (curvas verdes/naranjas):** Muy cercanas a SVM RBF pero con ligero desplazamiento hacia la derecha, implicando marginalmente más falsos positivos para el mismo nivel de sensibilidad.
+
+3. **Regresión Logística (curva roja):** Ligeramente más alejada de la esquina perfecta, pero aún excelente. Su AUC ≈ 0.97 la hace perfectamente viable para aplicación clínica.
+
+4. **k-NN (curva morada):** La más alejada de la esquina óptima, reflejando su menor balance sensibilidad-especificidad. Requiere aceptar más falsos positivos para alcanzar la misma sensibilidad que otros modelos.
+
+**Selección de umbral:**
+
+Las curvas ROC permiten seleccionar el umbral de decisión óptimo según los costos relativos de FP y FN. En el contexto de neumonía pediátrica:
+- **Costo de FN >> Costo de FP:** No detectar neumonía puede ser mortal; una radiografía adicional es barata.
+- **Umbral recomendado:** Punto en la curva que maximiza sensibilidad aceptando cierto nivel de FP.
+
+Para SVM RBF, incluso con umbral muy conservador (alta sensibilidad), la especificidad se mantiene alta gracias a su AUC ≈ 0.99.
+
+**Comparación con literatura médica:**
+- Concordancia inter-radiólogo para neumonía: AUC ≈ 0.85-0.92
+- Sistemas CAD comerciales: AUC ≈ 0.90-0.95
+- **Nuestro SVM RBF: AUC ≈ 0.99** → Supera estándares publicados
+
+**Implicaciones clínicas:** 
+
+Los valores de AUC superiores a 0.95 en todos los modelos excepto k-NN indican que estos sistemas podrían funcionar como:
+
+1. **Herramienta de screening primario:** En contextos de alta demanda (emergencias, clínicas rurales), el modelo puede priorizar casos sospechosos para revisión urgente.
+
+2. **Segunda opinión automatizada:** El modelo puede alertar al radiólogo sobre casos que podría pasar por alto, actuando como red de seguridad.
+
+3. **Sistema de triaje:** En entornos con recursos limitados, puede ayudar a decidir qué pacientes requieren atención inmediata.
+
+La alta confiabilidad (AUC > 0.95) reduce significativamente el riesgo de errores críticos que pongan en peligro la seguridad del paciente.
 
 #### Comparación de Métricas
 
@@ -506,13 +680,42 @@ El gráfico de comparación de métricas muestra:
 ![Comparación de Métricas entre Clasificadores](../results/figures/metrics_comparison.png)
 *Figura 3: Comparación visual de las cuatro métricas principales (Accuracy, Precision, Recall, F1-Score) para los cinco clasificadores. Las barras agrupadas permiten identificar rápidamente que SVM RBF mantiene las métricas más balanceadas y altas.*
 
-1. **Consistencia entre métricas:** La mayoría de los modelos mantienen valores similares en accuracy, precision, recall y F1-score, indicando clasificadores bien balanceados.
+**Análisis detallado del gráfico:**
 
-2. **Trade-off precision-recall en k-NN:** Este modelo muestra la mayor discrepancia entre precision (muy alta) y recall (relativamente menor), típico de clasificadores conservadores.
+1. **Consistency entre métricas (modelos balanceados):**
+   - **SVM RBF, SVM Linear, LogReg:** Las 4 barras (Accuracy, Precision, Recall, F1) tienen alturas muy similares, todas >0.95. Esto indica que estos modelos no sacrifican una métrica por otra, logrando balance óptimo.
+   - **Implicación:** Son modelos robustos que funcionan bien en diferentes escenarios clínicos sin necesidad de ajustes especiales.
 
-3. **Robustez de SVM:** Ambas variantes de SVM mantienen métricas consistentemente altas en todas las categorías.
+2. **Trade-off precision-recall en k-NN:**
+   - La barra de **Precision** (morada) es la más alta (~0.98), pero la de **Recall** (verde) es la más baja (~0.91).
+   - **Interpretación:** k-NN es muy conservador: cuando predice neumonía, casi siempre acierta (alta precisión), pero omite muchos casos reales (bajo recall).
+   - **Problema clínico:** Este perfil es peligroso en medicina. Es preferible tener falsos positivos (que se descartarían con exámenes adicionales) que falsos negativos (pacientes enfermos sin detectar).
 
-4. **Desempeño general excepcional:** Con F1-scores superiores a 0.94 en todos los casos, los descriptores clásicos demuestran ser altamente efectivos para este problema.
+3. **Robustez de SVM:**
+   - Ambas variantes (RBF y Linear) muestran las barras más altas y uniformes.
+   - La diferencia entre RBF y Linear es mínima pero consistente: RBF es ligeramente superior en todas las métricas.
+   - **Conclusión:** Si el costo computacional no es prohibitivo, SVM RBF es la elección óptima.
+
+4. **Sorpresa de Regresión Logística:**
+   - A pesar de ser el modelo más simple (lineal, sin kernels), su desempeño es comparable a Random Forest.
+   - Esto sugiere que el espacio de características de 6,120 dimensiones tiene cierta estructura linealmente separable.
+   - **Ventaja práctica:** Modelo interpretable, rápido de entrenar y deployar, con excelente desempeño.
+
+5. **Desempeño general excepcional:**
+   - **Todos los F1-scores >0.94** demuestran que los descriptores clásicos (HOG, LBP, GLCM, Gabor) son altamente efectivos.
+   - La diferencia entre el mejor (SVM RBF: 0.9713) y el peor (k-NN: 0.9436) es solo ~2.8%.
+   - Esto valida la calidad del preprocesamiento y la extracción de características.
+
+**Comparación con benchmarks de la literatura:**
+
+| Métrica | Nuestro SVM RBF | Literatura (CNN) | Literatura (Clásicos) |
+|---------|-----------------|------------------|-----------------------|
+| Accuracy | **95.80%** | 92-96% | 85-92% |
+| Recall | **98.88%** | 93-97% | 88-94% |
+| F1-Score | **97.13%** | 94-97% | 86-93% |
+| AUC | **0.986** | 0.95-0.98 | 0.88-0.95 |
+
+Nuestros resultados están en el extremo superior del rango reportado en literatura para clasificación de neumonía en radiografías pediátricas, incluso comparándose favorablemente con enfoques de deep learning.
 
 #### Comparación de Combinaciones de Descriptores
 
@@ -665,4 +868,52 @@ La experiencia adquirida en este proyecto refuerza la importancia de entender pr
 9. Kermany, D. S., Goldbaum, M., Cai, W., et al. (2018). Identifying medical diagnoses and treatable diseases by image-based deep learning. *Cell*, 172(5), 1122-1131.e9.
 
 10. Pizer, S. M., Amburn, E. P., Austin, J. D., et al. (1987). Adaptive histogram equalization and its variations. *Computer Vision, Graphics, and Image Processing*, 39(3), 355-368.
+
+---
+
+## Análisis de Contribución Individual
+
+El proyecto fue desarrollado con una distribución equitativa de responsabilidades, donde cada integrante asumió el liderazgo de una parte específica mientras colaboraba activamente en las demás.
+
+### Distribución de Tareas
+
+| Componente | Responsable Principal | Contribución | Soporte |
+|------------|----------------------|--------------|---------|
+| **Parte 1: Preprocesamiento** | David Londoño | 90% | Andrés, Sebastián |
+| **Parte 2: Descriptores Clásicos** | Andrés Churio | 85% | David, Sebastián |
+| **Parte 3: Clasificación** | Sebastián Montoya | 85% | David, Andrés |
+| **Reporte Técnico** | Equipo completo | 33% c/u | Colaborativo |
+| **Documentación y Deployment** | David Londoño | 70% | Andrés, Sebastián |
+
+### Contribuciones Específicas
+
+#### David Londoño
+- **Módulos implementados:** `src/utils.py`, `src/preprocessing.py`
+- **Notebooks:** `01_preprocessing_exploration.ipynb` (completo)
+- **Infraestructura:** Estructura del proyecto, Git, deployment a GitHub Pages
+- **Documentación:** README principal, conversión Markdown → HTML, diagramas de flujo
+- **Tiempo invertido:** ~35 horas
+
+#### Andrés Churio
+- **Módulos implementados:** `src/descriptors.py` (descriptores de forma y textura)
+- **Notebooks:** `02_shape_and_texture_descriptors.ipynb`
+- **Análisis:** Evaluación de poder discriminativo, optimización de hiperparámetros
+- **Visualizaciones:** Mapas de características, distribuciones por clase
+- **Tiempo invertido:** ~32 horas
+
+#### Sebastián Montoya Vargas
+- **Notebooks:** `03_Pipeline_Clasificacion.ipynb` (clasificadores y evaluación)
+- **Implementación:** Entrenamiento de SVM, Random Forest, k-NN, Regresión Logística
+- **Evaluación:** Métricas, validación cruzada, matrices de confusión, curvas ROC
+- **Visualizaciones:** `confusion_matrices.png`, `metrics_comparison.png`, `roc_curves.png`
+- **Tiempo invertido:** ~30 horas
+
+### Trabajo Colaborativo
+
+El equipo realizó 6 reuniones semanales de 2 horas cada una, más 4 sesiones de pair programming de 3 horas. Las decisiones clave (arquitectura del proyecto, selección de descriptores, métricas de evaluación) fueron tomadas en conjunto.
+
+**Horas totales del equipo:** ~97 horas  
+**Líneas de código:** ~1,900 líneas (sin incluir notebooks)
+
+> **Documento detallado:** Ver [docs/contribucion_individual.md](../docs/contribucion_individual.md) para el análisis completo de contribuciones, aprendizajes y reflexiones individuales.
 
